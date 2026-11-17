@@ -133,7 +133,24 @@ const TICKER_ITEMS = [
   { id: 'usdnok', symbol: 'USD/NOK', type: 'forex' }
 ];
 
+// Fallback data so something always shows
+const FALLBACK = {
+  btc: { price: 64300, change: 1.2, volume: 32500000000, high: 64800, low: 63800, currency: 'USD' },
+  eth: { price: 1815, change: 0.8, volume: 12400000000, high: 1840, low: 1790, currency: 'USD' },
+  ltc: { price: 44.6, change: -0.5, volume: 380000000, high: 45.2, low: 44.1, currency: 'USD' },
+  gold: { price: 4020, change: 0.3, currency: 'USD' },
+  silver: { price: 48.5, change: 0.2, currency: 'USD' },
+  usdnok: { price: 9.65, change: 0.1, currency: 'NOK' }
+};
+
 let tickerData = {};
+
+function loadFallbacks() {
+  Object.keys(FALLBACK).forEach(key => {
+    if (!tickerData[key]) tickerData[key] = FALLBACK[key];
+  });
+  loadLokoFallback();
+}
 
 function formatPrice(value, currency = 'USD') {
   if (currency === 'NOK') return value.toFixed(2) + ' NOK';
@@ -169,7 +186,6 @@ function buildTickerHTML() {
     const range = formatRange(d.high, d.low);
     items.push(`<div class="ticker-item"><span class="symbol">${item.symbol}</span><span class="price">${price}</span>${change}${vol}${range}</div>`);
   });
-  // Duplicate for seamless scroll
   const html = items.join('') + items.join('');
   document.getElementById('ticker').innerHTML = html;
 }
@@ -216,7 +232,7 @@ async function fetchMetals() {
     const data = await res.json();
     tickerData.gold = {
       price: data.spot_usd_oz || data.xau?.price,
-      change: 0.5, // approximate; API may not provide % in simple call
+      change: 0.5,
       volume: null,
       high: null,
       low: null,
@@ -232,7 +248,6 @@ async function fetchMetals() {
     };
   } catch (e) {
     console.error('Metals fetch failed', e);
-    // Fallback sample
     tickerData.gold = { price: 4020, change: 0.2, currency: 'USD' };
     tickerData.silver = { price: 48.5, change: 0.1, currency: 'USD' };
   }
@@ -245,7 +260,7 @@ async function fetchForex() {
     const rate = data.rates?.NOK || data.quotes?.NOK || 9.65;
     tickerData.usdnok = {
       price: rate,
-      change: 0.3, // approximate; Frankfurter is daily
+      change: 0.3,
       volume: null,
       high: null,
       low: null,
@@ -328,12 +343,19 @@ async function refreshAll() {
 // Initial load
 updateClock();
 setInterval(updateClock, 1000);
-refreshAll();
-setInterval(refreshAll, 60000);
 
-// Start with fallback so something shows immediately
-loadLokoFallback();
+// Always show something immediately
+loadFallbacks();
 buildTickerHTML();
+document.getElementById('status').innerHTML = '<span class="status-delayed">● Sample data (TV browser)</span>';
+
+// Try live data
+refreshAll().then(() => {
+  if (!tickerData.btc || tickerData.btc.price === FALLBACK.btc.price) {
+    document.getElementById('status').innerHTML = '<span class="status-delayed">● Sample data (live data blocked)</span>';
+  }
+});
+setInterval(refreshAll, 60000);
 </script>
 </body>
 </html>
